@@ -4,8 +4,9 @@ import swaggerUi from 'swagger-ui-express';
 import { CheckHealthUseCase } from '../application/features/health/CheckHealthUseCase';
 import { IEventPublisher } from '../domain/events/IEventPublisher';
 import { IStudyTaskRepository } from '../domain/repositories/IStudyTaskRepository';
-import { ConsoleEventPublisher } from '../infrastructure/messaging/ConsoleEventPublisher';
+import { RabbitMqPublisher } from '../infrastructure/messaging/RabbitMqPublisher';
 import { PrismaStudyTaskRepository } from '../infrastructure/persistence/PrismaStudyTaskRepository';
+import { eventsCatalogSpec, renderEventsDocsHtml } from './docs/eventsDocSpec';
 import { openapiSpec } from './docs/openapiSpec';
 import { errorHandler } from './middlewares/errorHandler';
 import { createTaskRoutes } from './routes/taskRoutes';
@@ -23,7 +24,7 @@ export function createApp(dependencies: AppDependencies = {}): Application {
 
   const checkHealthUseCase = new CheckHealthUseCase();
   const taskRepository = dependencies.taskRepository ?? new PrismaStudyTaskRepository();
-  const eventPublisher = dependencies.eventPublisher ?? new ConsoleEventPublisher();
+  const eventPublisher = dependencies.eventPublisher ?? new RabbitMqPublisher();
 
   app.get('/health', (_req: Request, res: Response) => {
     const result = checkHealthUseCase.execute();
@@ -35,6 +36,14 @@ export function createApp(dependencies: AppDependencies = {}): Application {
   });
 
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
+
+  app.get('/events-docs.json', (_req: Request, res: Response) => {
+    res.status(200).json(eventsCatalogSpec);
+  });
+
+  app.get('/events-docs', (_req: Request, res: Response) => {
+    res.status(200).type('html').send(renderEventsDocsHtml());
+  });
 
   app.use('/api/tasks', createTaskRoutes(taskRepository, eventPublisher));
 
